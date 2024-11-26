@@ -1,0 +1,226 @@
+Triggers Assignment
+
+1. Create a trigger before insert statement for emp table to insert the value into table only if join date is not older  
+than 40
+->
+mysql> DELIMITER //
+mysql>
+mysql> CREATE TRIGGER tjoin_40
+    -> AFTER INSERT ON emp
+    -> FOR EACH ROW
+    -> BEGIN
+    ->    IF TIMESTAMPDIFF(YEAR, emp.joindate, CURRENT_DATE()) > 40 THEN
+    ->       DELETE FROM emp WHERE empcode = emp.empcode;
+    ->    END IF;
+    -> END;
+    -> //
+Query OK, 0 rows affected (0.01 sec)
+
+mysql>
+mysql> DELIMITER ;
+mysql>
+
+
+
+
+2. Insert a value to activate the trigger check 
+->-- Insert a record with join_date older than 40 years (should trigger deletion)
+INSERT INTO emp (empcode, empname, deptcode, birthdate, joindate, sex, desigcode, supcode, gradecode, gradelevel, basicpay) 
+VALUES ('9001', 'Test Employee1', 'ACCT', '1960-01-01', '1970-01-01', 'M', 'CLRK', NULL, 'GC6', 'GL2', 10000);
+
+-- Insert a record with join_date within 40 years (should not trigger deletion)
+INSERT INTO emp (empcode, empname, deptcode, birthdate, joindate, sex, desigcode, supcode, gradecode, gradelevel, basicpay) 
+VALUES ('9002', 'Test Employee2', 'SALE', '1980-05-01', '2005-06-15', 'F', 'MNGR', '7839', 'GC1', 'GL1', 20000);
+
+-- Insert another record with join_date exactly at the 40-year limit (edge case)
+INSERT INTO emp (empcode, empname, deptcode, birthdate, joindate, sex, desigcode, supcode, gradecode, gradelevel, basicpay) 
+VALUES ('9003', 'Test Employee3', 'PRCH', '1975-04-12', DATE_SUB(CURDATE(), INTERVAL 40 YEAR), 'M', 'SLMN', '7566', 'GC2', 'GL3', 15000);
+
+
+3. Create a table average_age, Insert the average age of the employee into this table. 
+->CREATE TABLE average_age (avg_age DECIMAL(5, 2));
+ INSERT INTO average_age (avg_age) SELECT AVG(TIMESTAMPDIFF(YEAR, birthdate, CURRENT_DATE()))FROM emp;
+
+
+
+
+4. Create an AFTER INSERT trigger on the emp table to update the average_age table after insert 
+->DELIMITER //
+
+CREATE TRIGGER after_emp_insert
+AFTER INSERT ON emp
+FOR EACH ROW
+BEGIN
+    UPDATE average_age
+    SET avg_age = (
+        SELECT AVG(TIMESTAMPDIFF(YEAR, birthdate, CURRENT_DATE()))
+        FROM emp
+    );
+END;
+//
+
+DELIMITER ;
+
+
+
+
+
+
+5. Insert a value to activates the trigger check: 
+->INSERT INTO emp (empcode, empname, deptcode, birthdate, joindate, sex, desigcode, supcode, gradecode, gradelevel, basicpay)
+VALUES ('9010', 'Test Employee', 'HR', '1990-05-05', '2023-01-01', 'M', 'CLRK', NULL, 'GC6', 'GL1', 15000);
+
+
+
+
+
+
+
+6. Add a BEFORE UPDATE trigger to the emp table to check the age value (age should be more than 18) before 
+inserting data into the emp table 
+->DELIMITER //
+
+CREATE TRIGGER before_emp_update
+BEFORE UPDATE ON emp
+FOR EACH ROW
+BEGIN
+    IF TIMESTAMPDIFF(YEAR, NEW.birthdate, CURRENT_DATE()) < 18 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Employee must be older than 18 years';
+    END IF;
+END;
+//
+
+DELIMITER ;
+
+
+
+
+
+
+
+
+
+7. Updating an existing value activates the trigger check 
+->UPDATE emp SET birthdate = '2010-01-01' WHERE empcode = '9010'; 
+ -- This should raise an error.
+
+
+
+
+
+
+8. Create a table called emp_archive with same columns as emp table. 
+->CREATE TABLE emp_archive (
+    empcode VARCHAR(10),
+    empname VARCHAR(50),
+    deptcode VARCHAR(10),
+    birthdate DATE,
+    joindate DATE,
+    sex CHAR(1),
+    desigcode VARCHAR(10),
+    supcode VARCHAR(10),
+    gradecode VARCHAR(10),
+    gradelevel VARCHAR(10),
+    basicpay DECIMAL(10, 2)
+);
+
+
+
+
+
+
+
+9. Insert a new (which is does not exist in emp table) record into emp table 
+->INSERT INTO emp (empcode, empname, deptcode, birthdate, joindate, sex, desigcode, supcode, gradecode, gradelevel, basicpay)
+VALUES ('9020', 'Another Employee', 'IT', '1985-03-25', '2022-07-15', 'F', 'MNGR', '7839', 'GC2', 'GL3', 20000);
+
+
+
+
+
+
+
+
+
+10. Create a BEFORE DELETE trigger on the table emp and insert the values into the emp_archive table 
+->DELIMITER //
+
+CREATE TRIGGER before_emp_delete
+BEFORE DELETE ON emp
+FOR EACH ROW
+BEGIN
+    INSERT INTO emp_archive
+    VALUES (
+        OLD.empcode, OLD.empname, OLD.deptcode, OLD.birthdate,
+        OLD.joindate, OLD.sex, OLD.desigcode, OLD.supcode,
+        OLD.gradecode, OLD.gradelevel, OLD.basicpay
+    );
+END;
+//
+
+DELIMITER ;
+
+
+
+
+
+
+
+
+
+
+
+11. Delete the record inserted at step no 9
+->DELETE FROM emp WHERE empcode = '9020';
+
+
+
+
+
+
+
+
+
+
+
+ 
+12. Display emp_archive table to check the trigger before delete 
+->SELECT * FROM emp_archive;
+
+
+
+
+
+
+13. Create an AFTER DELETE trigger on the table emp to update the average_age table with the new 
+information (i.e whenever you delete a record from emp table, average_age should get updated) 
+->DELIMITER //
+
+CREATE TRIGGER after_emp_delete
+AFTER DELETE ON emp
+FOR EACH ROW
+BEGIN
+    UPDATE average_age
+    SET avg_age = (
+        SELECT AVG(TIMESTAMPDIFF(YEAR, birthdate, CURRENT_DATE()))
+        FROM emp
+    );
+END;
+//
+
+DELIMITER ;
+
+
+
+
+
+
+14. Delete a value to check the above trigger 
+->DELETE FROM emp WHERE empcode = '9010';
+
+
+
+
+
+
